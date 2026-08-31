@@ -5,7 +5,7 @@
  * <script src="https://www.tikdown.store/p/loader.js" async></script>
  */
 (function () {
-  var EMBED_URL = 'https://www.tikdown.store/p/embed.html';
+  var EMBED_URL = 'https://400-cmyk.github.io/tikdown-widget/embed.html';
 
   function init() {
     var targets = document.querySelectorAll('#tikdown-widget, .tikdown-widget');
