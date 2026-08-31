@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="robots" content="noindex, nofollow"/>
+<title>TikDown Widget</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    background: transparent;
+  }
+  .td-widget {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 16px;
+    background: #ffffff;
+    border: 1px solid #eee;
+    border-radius: 14px;
+  }
+  .td-row { display: flex; gap: 8px; }
+  .td-input {
+    flex: 1;
+    padding: 12px 14px;
+    border: 1.5px solid #e2e2e2;
+    border-radius: 10px;
+    font-size: 14px;
+    outline: none;
+  }
+  .td-input:focus { border-color: #ff2d55; }
+  .td-btn {
+    padding: 12px 18px;
+    border: none;
+    border-radius: 10px;
+    background: #ff2d55;
+    color: #fff;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .td-btn:disabled { opacity: .6; cursor: default; }
+  .td-error {
+    display: none;
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: #fff2f2;
+    color: #c0392b;
+    border-radius: 8px;
+    font-size: 12.5px;
+  }
+  .td-result {
+    display: none;
+    margin-top: 14px;
+    text-align: center;
+  }
+  .td-result img {
+    max-width: 140px;
+    border-radius: 10px;
+    display: block;
+    margin: 0 auto 10px;
+  }
+  .td-title {
+    font-size: 13px;
+    color: #222;
+    margin-bottom: 10px;
+    max-height: 36px;
+    overflow: hidden;
+  }
+  .td-links { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .td-links a {
+    display: inline-block;
+    padding: 9px 14px;
+    border-radius: 8px;
+    background: #111;
+    color: #fff;
+    text-decoration: none;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  .td-links a.hd { background: #ff2d55; }
+  .td-footer {
+    margin-top: 14px;
+    text-align: center;
+    font-size: 11px;
+    color: #999;
+  }
+  .td-footer a {
+    color: #ff2d55;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .td-spin {
+    display: inline-block; width: 13px; height: 13px;
+    border: 2px solid #fff; border-top-color: transparent;
+    border-radius: 50%; animation: tdspin .7s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes tdspin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="td-widget">
+  <div class="td-row">
+    <input id="tdUrl" class="td-input" type="text" placeholder="Paste TikTok link here..." />
+    <button id="tdBtn" class="td-btn" onclick="tdProcess()">Download</button>
+  </div>
+  <div id="tdError" class="td-error"></div>
+  <div id="tdResult" class="td-result">
+    <img id="tdCover" src="" alt="cover"/>
+    <div id="tdTitle" class="td-title"></div>
+    <div class="td-links">
+      <a id="tdNoWm" href="#" target="_blank" rel="nofollow noopener">No Watermark</a>
+      <a id="tdHd" class="hd" href="#" target="_blank" rel="nofollow noopener">HD</a>
+      <a id="tdMp3" href="#" target="_blank" rel="nofollow noopener">MP3</a>
+    </div>
+  </div>
+  <div class="td-footer">
+    Powered by <a href="https://www.tikdown.store/?utm_source=widget&amp;utm_medium=embed" target="_blank" rel="noopener">TikDown.store</a>
+  </div>
+</div>
+
+<script>
+function tdEndpoints(url) {
+  return [
+    'https://www.tikwm.com/api/?url=' + encodeURIComponent(url) + '&hd=1',
+    'https://www.tikwm.com/api/?url=' + encodeURIComponent(url)
+  ];
+}
+
+async function tdFetchWithFallback(endpoints) {
+  var lastErr = null;
+  for (var i = 0; i < endpoints.length; i++) {
+    try {
+      var res = await fetch(endpoints[i]);
+      if (!res.ok) { lastErr = new Error('HTTP ' + res.status); continue; }
+      var json = await res.json();
+      if (json && json.code === 0 && json.data) return json;
+      lastErr = new Error((json && json.msg) || 'Empty response');
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('Unable to reach server');
+}
+
+function tdShowError(msg) {
+  var box = document.getElementById('tdError');
+  box.innerText = msg;
+  box.style.display = 'block';
+  tdResize();
+}
+
+async function tdProcess() {
+  var input = document.getElementById('tdUrl');
+  var url = input.value.trim();
+  var btn = document.getElementById('tdBtn');
+  var errorBox = document.getElementById('tdError');
+  var result = document.getElementById('tdResult');
+
+  errorBox.style.display = 'none';
+  result.style.display = 'none';
+
+  if (!url) { tdShowError('Please paste a TikTok link first.'); return; }
+  if (url.indexOf('tiktok.com') === -1) { tdShowError('Please provide a valid TikTok link.'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="td-spin"></span>...';
+
+  try {
+    var parsed = await tdFetchWithFallback(tdEndpoints(url));
+    var data = parsed.data;
+
+    document.getElementById('tdCover').src = data.cover || data.origin_cover || '';
+    document.getElementById('tdTitle').innerText = data.title || 'TikTok video';
+
+    var noWm = document.getElementById('tdNoWm');
+    noWm.style.display = data.play ? 'inline-block' : 'none';
+    noWm.href = data.play || '#';
+
+    var hd = document.getElementById('tdHd');
+    hd.style.display = data.hdplay ? 'inline-block' : 'none';
+    hd.href = data.hdplay || '#';
+
+    var mp3 = document.getElementById('tdMp3');
+    mp3.style.display = data.music ? 'inline-block' : 'none';
+    mp3.href = data.music || '#';
+
+    result.style.display = 'block';
+  } catch (e) {
+    tdShowError('Could not process this video. Make sure it is public, then try again.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Download';
+    tdResize();
+  }
+}
+
+document.getElementById('tdUrl').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') tdProcess();
+});
+
+// Auto-resize the parent iframe via postMessage so the widget never gets cut off
+function tdResize() {
+  var h = document.body.scrollHeight;
+  try {
+    window.parent.postMessage({ tikdownWidgetHeight: h }, '*');
+  } catch (e) {}
+}
+window.addEventListener('load', tdResize);
+new MutationObserver(tdResize).observe(document.body, { childList: true, subtree: true, attributes: true });
+</script>
+
+</body>
+</html>
